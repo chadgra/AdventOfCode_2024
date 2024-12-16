@@ -1,6 +1,7 @@
 import argparse
 from collections import namedtuple
 import math
+from time import sleep
 
 DAY=14
 parser = argparse.ArgumentParser(description=f"Run day {DAY} of Advent of Code")
@@ -92,7 +93,7 @@ class Lobby:
             if Coord((WIDTH - 1) / 2, 0) in self.guards_set:
                 self.print()
                 print(f"After {seconds} seconds")
-                input("")
+                sleep(0.01)
             seconds += 1
 
 
