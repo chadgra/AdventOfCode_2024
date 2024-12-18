@@ -12,8 +12,10 @@ parser = argparse.ArgumentParser(description=f"Run day {DAY} of Advent of Code")
 parser.add_argument("-f", "--full", action="store_true", help="Run against the full input, not just the test input (default)")
 args = parser.parse_args()
 
+BEST_SOLUTION = 94444
 input_file = f"input_{DAY:02}.txt"
 if not args.full:
+    BEST_SOLUTION = 11048
     input_file = "test_" + input_file
 
 def next_line(file):
@@ -54,6 +56,11 @@ class Dir(Enum):
             case Dir.NORTH:
                 return Coord(coord.r - 1, coord.c)
 
+def get_score(solution):
+    return solution.steps + (solution.turns * 1000)
+
+def increment_solution(solution, steps, turns):
+    return Solution(solution.steps + steps, solution.turns + turns)
 
 class Map:
     def __init__(self):
@@ -65,8 +72,8 @@ class Map:
         self.solutions = set()
         self.width = 0
         self.height = 0
-        self.visited_states = set()
         self.visited_coords = {}
+        self.coords_on_best_route = set()
 
     def add_line(self, line, is_double=False):
         r = self.height
@@ -89,54 +96,56 @@ class Map:
         for r in range(self.height):
             line = ""
             for c in range(self.width):
-                chr = " " if Coord(r, c) not in self.map else self.map[Coord(r, c)]
+                if Coord(r, c) in self.coords_on_best_route:
+                    chr = "O"
+                else:
+                    chr = " " if Coord(r, c) not in self.map else self.map[Coord(r, c)]
                 line += chr
             print(line)
 
-    def traverse_map(self, coord, dir, steps, turns):
+    def traverse_map(self, coord, dir, solution, path):
+        if get_score(solution) > BEST_SOLUTION:
+            return
+
         if coord == self.end:
             # we are at the end, so remember this path
-            self.solutions.add(Solution(steps, turns))
+            self.solutions.add(solution)
+            self.coords_on_best_route.update(path + [coord])
             return
-        
-        # state = State(coord, dir)
-        # if state in self.visited_states:
-        #     # we've already been here facing this direction, so return
-        #     return
-        
+
         if coord in self.visited_coords:
             prev_solution = self.visited_coords[coord]
-            prev_score = prev_solution.steps + (prev_solution.turns * 1000)
-            cur_score = steps + (turns * 1000)
-            if prev_score < cur_score:
+            prev_score = get_score(prev_solution)
+            cur_score = get_score(solution)
+            if prev_score + 1000 < cur_score:
                 return
-        
+
         # print(f"at {coord} facing {dir} after {steps} steps and {turns} turns")
         if coord in self.map and self.map[coord] == "#":
             # this is a wall, so return
             return
         
         # remember this state
-        # self.visited_states.add(state)
-        self.visited_coords[coord] = Solution(steps, turns)
-        self.traverse_map(dir.next_step(coord), dir, steps + 1, turns)
+        self.visited_coords[coord] = solution
+        self.traverse_map(dir.next_step(coord), dir, increment_solution(solution, 1, 0), path + [coord])
         cw = dir.next_turn_cw()
-        self.traverse_map(cw.next_step(coord), cw, steps + 1, turns + 1)
+        self.traverse_map(cw.next_step(coord), cw, increment_solution(solution, 1, 1), path + [coord])
         cw = cw.next_turn_cw()
-        self.traverse_map(cw.next_step(coord), cw, steps + 1, turns + 2)
+        self.traverse_map(cw.next_step(coord), cw, increment_solution(solution, 1, 2), path + [coord])
         ccw = dir.next_turn_ccw()
-        self.traverse_map(ccw.next_step(coord), ccw, steps + 1, turns + 1)
+        self.traverse_map(ccw.next_step(coord), ccw, increment_solution(solution, 1, 1), path + [coord])
 
     def get_best_solution(self):
-        self.traverse_map(self.start, Dir.EAST, 0, 0)
+        self.traverse_map(self.start, Dir.EAST, Solution(0, 0), [self.start])
 
         min_score = 999999999999999999999999999999
         for solution in self.solutions:
-            score = solution.steps + (1000 * solution.turns)
+            score = get_score(solution)
             # print(solution)
             # print(score)
             min_score = min(min_score, score)
         print(f"Best score: {min_score}")
+        print(f"Coords visited: {len(self.coords_on_best_route)}")
 
 
 def get_map(is_double=False):
@@ -149,6 +158,7 @@ def do_part_1():
     map = get_map()
     map.print()
     map.get_best_solution()
+    map.print()
 
 def do_part_2():
     return
