@@ -5,7 +5,7 @@ import math
 from time import sleep
 import sys
 print(sys.getrecursionlimit())
-sys.setrecursionlimit(100)  # Set the new limit
+sys.setrecursionlimit(2000)  # Set the new limit
 
 DAY=23
 parser = argparse.ArgumentParser(description=f"Run day {DAY} of Advent of Code")
@@ -41,18 +41,6 @@ class HashableObject:
     def __repr__(self):
         return self.__str__()
 
-class LanParty(HashableObject):
-    def __init__(self, members):
-        super().__init__()
-        assert(3 == len(members))
-        members.sort()
-        self.a = members.pop(0)
-        self.b = members.pop(0)
-        self.c = members.pop(0)
-
-    def __str__(self):
-        return f"\n{self.a.name},{self.b.name},{self.c.name}"
-
 class Computer(HashableObject):
     def __init__(self, name):
         self.name = name
@@ -78,14 +66,18 @@ class Computer(HashableObject):
                 if (i in j.connections) and (i in k.connections) and \
                    (j in i.connections) and (j in k.connections) and \
                    (k in i.connections) and (k in j.connections):
-                    # It's a party
-                    lan_parties.add(LanParty([i, j, k]))
+                    # It's a party!!
+                    name = [i.name, j.name, k.name]
+                    name.sort()
+                    lan_parties.add(",".join(name))
         return lan_parties
 
 class Network:
     def __init__(self):
         self.computers = {}
         self.lan_parties = set()
+        self.size_of_each_party = 0
+        self.connection_count_map = {}
 
     def add_line(self, line):
         computers = []
@@ -103,17 +95,73 @@ class Network:
     def print(self):
         print(self.computers)
 
+    def lan_party_name_to_members(self, name):
+        members = []
+        for member_name in name.split(","):
+            members.append(self.computers[member_name])
+        return members
+
+    def lan_party_party_members_to_name(self, members, exclude=[]):
+        member_names = []
+        for member in members:
+            if member not in exclude:
+                member_names.append(member.name)
+        member_names.sort()
+        return ",".join(member_names)
+
     def find_lan_parties(self):
+        self.size_of_each_party = 3
         for computer in self.computers.values():
             self.lan_parties.update(computer.get_lan_parties())
         # print(self.lan_parties)
 
+    def increase_lan_party_size(self):
+        bigger_parties = set()
+        for party in self.lan_parties:
+            party_members = self.lan_party_name_to_members(party)
+            for party_member in party_members:
+                for connection in party_member.connections:
+                    if connection not in party_members:
+                        potential_party = self.lan_party_party_members_to_name(party_members + [connection], [party_member])
+                        if potential_party in self.lan_parties:
+                            bigger_parties.add(self.lan_party_party_members_to_name(party_members + [connection]))
+
+        self.size_of_each_party += 1
+        self.lan_parties = bigger_parties        
+
+    def find_connection_count(self):
+        for computer in self.computers.values():
+            num_connections = len(computer.connections)
+            self.connection_count_map[num_connections] = self.connection_count_map.get(num_connections, 0) + 1
+        print(self.connection_count_map)
+
+    def find_largest_connected_component(self):
+        visited = set()
+        max_size = 0
+
+        def dfs(computer):
+            visited.add(computer)
+            current_size = 1
+            for neighbor in computer.connections:
+                if neighbor not in visited:
+                    current_size += dfs(neighbor)
+            return current_size
+
+        for computer in self.computers.values():
+            if computer not in visited:
+                current_component_size = dfs(computer)
+                max_size = max(max_size, current_component_size)
+
+        print(f"largest connected component: {max_size}")
+        return max_size
+
     def count_lan_parties_with_t(self):
         count = 0
         for lan_party in self.lan_parties:
-            if lan_party.a.name.startswith("t") or \
-               lan_party.b.name.startswith("t") or \
-               lan_party.c.name.startswith("t"):
+            members = lan_party.split(",")
+            if members[0].startswith("t") or \
+               members[1].startswith("t") or \
+               members[2].startswith("t"):
                 count += 1
         print(f"{count} parties have a computer that starts with t")
         return count
@@ -136,7 +184,16 @@ def do_part_1():
     network.count_lan_parties_with_t()
 
 def do_part_2():
-    pass
+    network = get_network()
+    network.find_lan_parties()
+    print(f"{len(network.lan_parties)} with {network.size_of_each_party} members")
+    while len(network.lan_parties) > 1:
+        network.increase_lan_party_size()
+        print(f"{len(network.lan_parties)} with {network.size_of_each_party} members")
 
-do_part_1()
-# do_part_2()
+    print(network.lan_parties)
+    # network.find_connection_count()
+    # network.find_largest_connected_component()
+
+# do_part_1()
+do_part_2()
